@@ -1,7 +1,6 @@
 includelib ucrt.lib
 includelib legacy_stdio_definitions.lib
-
-includelib user32.lib                ; <--- ADICIONADO: Necessário para GetAsyncKeyState
+includelib user32.lib 
 
 ; --- Funções do Windows ---
 extrn GetStdHandle : proc
@@ -9,7 +8,7 @@ extrn SetConsoleCursorInfo : proc
 extrn SetConsoleTitleA : proc
 extrn SetConsoleCursorPosition : proc 
 extrn ReadConsoleInputA : proc       
-extrn GetAsyncKeyState : proc        ; <--- Vem da user32.lib
+extrn GetAsyncKeyState : proc     
 extrn Sleep : proc                   
 extrn ExitProcess : proc
 
@@ -18,18 +17,23 @@ extrn _kbhit : proc
 extrn _getch : proc
 extrn putchar : proc
 
+; --- Estruturas ---
+CONSOLE_CURSOR_INFO STRUCT
+    dwSize      DWORD ?
+    bVisible    DWORD ?
+CONSOLE_CURSOR_INFO ENDS
+
+;;;;;;;;;;;;;;;;;     DATA    ;;;;;;;;;;;;;;;;;;
 
 .data
-;SnakeDim	QWORD 1 ;(Initial size: just the head)
-;SnakeDirection QWORD 0 ;(0=Up, 1=Down, 2=Left, 3=Right)
-;points QWORD 0
-
     STD_OUTPUT_HANDLE equ -11
     STD_INPUT_HANDLE  equ -10
     
     ; Strings
-    tituloJanela db "SNAKE ASM - Versao Estavel", 0
-    msgStart     db "Pressione uma tecla para comecar...", 0
+    tituloJanela db "SNAKE GAME", 0
+    msgStart1 db "Your goal is to eat the fruit () to add points, and as you add points the snake becomes longer", 0
+    msgStart2 db "To change directions use the arrow keys or AWSD", 0
+    msgStart3 db "Press any key to start", 0
     
     ; Variáveis
     hStdOut      qword 0
@@ -41,8 +45,10 @@ extrn putchar : proc
     posX         byte 40
     posY         byte 12
 
+    ;variavel para saber a direçao
+    currentDir   byte 0   ; 1=Left, 2=Up, 3=Right, 4=Down
 
-
+;;;;;;;;;;;;;;;;;     CODE    ;;;;;;;;;;;;;;;;;;
 
 .code
 main proc
@@ -53,99 +59,62 @@ main proc
     call GetStdHandle
     mov hStdOut, rax
 
-    mov rcx, STD_INPUT_HANDLE
-    call GetStdHandle
-    mov hStdIn, rax
-
     lea rcx, tituloJanela
     call SetConsoleTitleA
 
-    mov rcx, hStdOut
-    lea rdx, cursorInfo
-    call SetConsoleCursorInfo
+    call cursor
+    call mensagemInicial
+    mov currentDir, 3                ; chamar aqui a função random
+    call game
 
-    ; 2. TELA DE INÍCIO
-    lea rbx, msgStart       ; RBX é seguro usar aqui
-PrintLoop:
-    xor rcx, rcx            ; Limpa RCX
-    mov cl, [rbx]           ; Pega apenas o byte do char
-    test cl, cl             ; É zero (fim da string)?
-    jz WaitKey
-
-    call putchar
-    inc rbx
-    jmp PrintLoop
-
-WaitKey:
-    call _kbhit
-    test eax, eax
-    jz WaitKey 
-
-    call _getch             ; Consome a tecla pressionada
-
-    ; 3. LOOP DO JOGO
-GameLoop:
-    ; A. Apagar rastro (Desenha espaço na posição atual)
-    call MoverCursor
-    mov rcx, 32             ; ASCII Space
-    call putchar
-
-    ; B. Input
-    ; DIREITA (VK_RIGHT = 0x27)
-    mov rcx, 27h 
-    call GetAsyncKeyState
-    test ax, 8000h          ; Bit mais significativo indica tecla pressionada
-    jnz MoveRight
-
-    ; ESQUERDA (VK_LEFT = 0x25)
-    mov rcx, 25h
-    call GetAsyncKeyState
-    test ax, 8000h
-    jnz MoveLeft
-
-    jmp Render
-
-MoveRight:
-    inc posX
-    jmp Render
-MoveLeft:
-    dec posX
-    jmp Render
-
-    ; C. Renderizar (Desenha 'O' na nova posição)
-Render:
-    call MoverCursor    
-    
-    mov rcx, 'O'        
-    call putchar
-
-    ; D. Timing
-    mov rcx, 100        
-    call Sleep
-
-    jmp GameLoop        
-
-    ; FIM
     mov rcx, 0
     call ExitProcess
 main endp
+;;;;;;;;;;;;;;;;;  END OF MAIN ;;;;;;;;;;;;;;;;;
 
-; --------------------------------------------------------------------
-; Procedimento Auxiliar: MoverCursor
-; --------------------------------------------------------------------
-MoverCursor proc
-    ; ================================================================
-    ; PROTEÇÃO DE REGISTRADORES (ABI x64)
-    ; RBX é "Non-volatile". Se usarmos, temos que salvar e restaurar.
-    ; ================================================================
+
+
+
+
+;window proc
+
+;    sub rsp, 40
+
+
+
+
+;    add rsp, 40
+;    ret
+
+cursor proc
+    ; =========================================================================
+    ; PARTE 1: PREPARAÇÃO DO AMBIENTE
+    ; O objetivo aqui é esconder aquele cursor que fica a piscar "_" na consola
+    ; para o jogo ficar mais limpo visualmente.
+    ; =========================================================================
+    sub rsp, 40
+
+    mov rcx, hStdOut        ; RCX = Identificador da janela da consola (ecrã)
+    lea rdx, cursorInfo     ; RDX = Endereço da struct que diz "visível = 0" (falso)
+    call SetConsoleCursorInfo ; Chama a função do Windows: "Aplica estas configurações"
+
+    add rsp, 40
+    ret
+
+cursor endp
+
+; ====================================================================
+; Mover Cursor do Windows
+; ====================================================================
+
+moverCursor proc
     push rbx                ; Salva o valor original de RBX
-
-    ; Formatar RDX como 0x00YYXXXX (COORD)
+    sub rsp, 32
     
     ; 1. Tratar Y (High part)
     xor rax, rax
     mov al, posY
-    shl eax, 16             ; Move Y para os bits superiores
+    shl eax, 16             ; Y nos bits altos
 
     ; 2. Tratar X (Low part)
     xor rbx, rbx
@@ -159,8 +128,195 @@ MoverCursor proc
     mov rdx, rax            ; Posição (passada por valor no RDX)
     call SetConsoleCursorPosition
 
+    add rsp, 32
     pop rbx                 ; Restaura RBX (Crucial para não crashar main)
     ret
-MoverCursor endp
+moverCursor endp
+
+mensagemInicial proc
+    ; =========================================================================
+    ; PARTE 2: ESCREVER A MENSAGEM INICIAL
+    ; Aqui usamos um loop para imprimir caractere por caractere.
+    ; =========================================================================
+    sub rsp, 40
+
+    lea rbx, msgStart1      ; Carrega a primeira frase
+    Loop1:
+        xor rcx, rcx
+        mov cl, [rbx]
+        test cl, cl
+        jz paragrafo          ; Acabou a linha 1? Vai dar o Enter
+        call putchar
+        inc rbx
+        jmp Loop1
+
+    paragrafo:
+        mov rcx, 10             
+        call putchar
+
+     lea rbx, msgStart2
+     Loop2:
+         xor rcx, rcx
+         mov cl, [rbx]
+         test cl, cl
+         jz paragrafo2              ; Acabou linha 2? Espera tecla
+         call putchar
+         inc rbx
+         jmp Loop2
+
+     paragrafo2:
+        mov rcx, 10             
+        call putchar
+        mov rcx, 10             
+        call putchar
+
+     lea rbx, msgStart3
+     Loop3:
+         xor rcx, rcx
+         mov cl, [rbx]
+         test cl, cl
+         jz WaitKey              ; Acabou linha 2? Espera tecla
+         call putchar
+         inc rbx
+         jmp Loop3
+
+    ; =========================================================================
+    ; PARTE 3: ESPERAR PELO JOGADOR
+    ; O jogo fica parado aqui até alguém carregar numa tecla.
+    ; =========================================================================
+WaitKey:
+    call _kbhit             ; Verifica: "Há alguma tecla no buffer?" (Não bloqueia)
+                            ; Retorna 1 em EAX se houver, 0 se não houver.
+    
+    test eax, eax           ; Compara o retorno.
+    jz WaitKey              ; Se for 0 (ninguém tocou em nada), repete o loop infinitamente.
+
+    call _getch             ; Se chegamos aqui, alguém tocou numa tecla!
+                            ; Chamamos _getch para "comer" essa tecla e limpar o buffer.
+                            ; Se não fizermos isto, o buffer fica sujo para o jogo.
+    add rsp, 40
+    ret
+mensagemInicial endp
+
+
+game proc
+
+    ; =========================================================================
+    ; PARTE 4: O LOOP DO JOGO (O CORAÇÃO)
+    ; A lógica aqui é: Apagar Posição Velha -> Calcular Nova -> Desenhar Nova
+    ; =========================================================================
+    sub rsp, 40
+
+GameLoop:
+    ; --- A. APAGAR O RASTRO ---
+    ; Antes de movermos a cobra, temos de apagar onde ela estava no frame anterior.
+    
+    call moverCursor        ; Move o cursor interno do Windows para (posX, posY)
+    
+    mov rcx, 32             ; 32 é o código ASCII para ESPAÇO (' ')
+    call putchar            ; Escreve um espaço em branco.
+                            ; Visualmente, isto "apaga" o 'O' que estava lá.
+
+    ; --- B. VERIFICAR INPUT (Teclado) ---
+    ; Aqui usamos GetAsyncKeyState porque queremos saber se a tecla está 
+    ; pressionada AGORA, permitindo movimento contínuo e rápido.
+
+     ; ESQUERDA (Seta ou A)
+    mov rcx, 25h
+    call GetAsyncKeyState   ; Pergunta ao Windows o estado dessa tecla
+    test ax, 8000h          ; O bit mais alto (8000h) diz se está pressionada agora.
+    jnz SetLeft             ; Se não clicou, verifica próxima
+    mov rcx, 41h            ; 'A'
+    call GetAsyncKeyState
+    test ax, 8000h
+    jnz SetLeft
+
+   ; CIMA (Seta ou W)
+    mov rcx, 26h
+    call GetAsyncKeyState
+    test ax, 8000h
+    jnz SetUp
+    mov rcx, 57h            ; 'W'
+    call GetAsyncKeyState
+    test ax, 8000h
+    jnz SetUp
+
+    ; DIREITA (Seta ou D)
+    mov rcx, 27h
+    call GetAsyncKeyState
+    test ax, 8000h
+    jnz SetRight
+    mov rcx, 44h            ; 'D'
+    call GetAsyncKeyState
+    test ax, 8000h
+    jnz SetRight
+
+    ; BAIXO (Seta ou S)
+    mov rcx, 28h
+    call GetAsyncKeyState
+    test ax, 8000h
+    jnz SetDown
+    mov rcx, 53h            ; 'S'
+    call GetAsyncKeyState
+    test ax, 8000h
+    jnz SetDown
+
+    jmp ApplyMove           ; Nenhuma tecla nova? Mantém a direção atual
+
+SetLeft:
+    mov currentDir, 0
+    jmp ApplyMove
+SetUp:
+    mov currentDir, 1
+    jmp ApplyMove
+SetRight:
+    mov currentDir, 2
+    jmp ApplyMove
+SetDown:
+    mov currentDir, 3
+    jmp ApplyMove
+
+    ; --- C. APLICAR MOVIMENTO ---
+ApplyMove:
+    cmp currentDir, 0
+    je GoLeft
+    cmp currentDir, 1
+    je GoUp
+    cmp currentDir, 2
+    je GoRight
+    cmp currentDir, 3
+    je GoDown
+    jmp Render
+
+GoLeft:
+    dec posX
+    jmp Render
+GoUp:
+    dec posY                ; Cima = Y menor
+    jmp Render
+GoRight:
+    inc posX
+    jmp Render
+GoDown:
+    inc posY                ; Baixo = Y maior
+    jmp Render
+
+    ; --- D. RENDERIZAR ---
+Render:
+    call moverCursor
+    mov rcx, '@'            ; Cobra
+    call putchar
+
+    ; --- E. VELOCIDADE ---
+    mov rcx, 100            ; 100ms
+    call Sleep
+
+    jmp GameLoop            ; Repete para sempre
+
+    ; (Este ponto nunca é atingido num loop infinito)
+    add rsp, 40
+    ret
+game endp
+
 
 end

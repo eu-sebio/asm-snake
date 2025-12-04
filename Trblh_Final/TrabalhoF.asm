@@ -1,10 +1,22 @@
 includelib ucrt.lib
 includelib legacy_stdio_definitions.lib
 
-extern _kbhit:proc ;see class6 slides for use case
-extern _getch:proc
-extern putchar:proc
-;extern rand: proc
+includelib user32.lib                ; <--- ADICIONADO: Necessário para GetAsyncKeyState
+
+; --- Funções do Windows ---
+extrn GetStdHandle : proc
+extrn SetConsoleCursorInfo : proc
+extrn SetConsoleTitleA : proc
+extrn SetConsoleCursorPosition : proc 
+extrn ReadConsoleInputA : proc       
+extrn GetAsyncKeyState : proc        ; <--- Vem da user32.lib
+extrn Sleep : proc                   
+extrn ExitProcess : proc
+
+; --- Funções de C ---
+extrn _kbhit : proc
+extrn _getch : proc
+extrn putchar : proc
 
 
 .data
@@ -12,200 +24,143 @@ extern putchar:proc
 ;SnakeDirection QWORD 0 ;(0=Up, 1=Down, 2=Left, 3=Right)
 ;points QWORD 0
 
+    STD_OUTPUT_HANDLE equ -11
+    STD_INPUT_HANDLE  equ -10
+    
+    ; Strings
+    tituloJanela db "SNAKE ASM - Versao Estavel", 0
+    msgStart     db "Pressione uma tecla para comecar...", 0
+    
+    ; Variáveis
+    hStdOut      qword 0
+    hStdIn       qword 0
+    
+    cursorInfo   CONSOLE_CURSOR_INFO <100, 0> 
 
-
-startGameMenu db " Start ", 0
+    ; Posição da Cobra
+    posX         byte 40
+    posY         byte 12
 
 
 
 
 .code
-
-
-proc main
-    call init
-
-
-
-endp main
-
-
-;+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-;
-;    Game initialisation.
-;
-;+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-proc init
-        call graphicMode
-        call menu
-
-
-
-init endp
-
-;+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-;
-;    Menu.
-;
-;+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-proc menu
-    mov bl, 0fh
-    move si, offset startGameMenu
-
-
-menu endp
-
-;+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-;
-;    Graphic mode.
-;
-;+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-proc graphicMode
-        push AX
-        mov AL, 13h
-        mov AH, 0
-        int 10h
-        pop AX
-        ret
-graphicMode endp
-
-;+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-;
-;    Draw pixel.
-;
-;+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-proc drawPixel
-        push AX   
-        mov AX, BP
-        mov AH, 0Ch
-        int 10h
-        pop AX
-        ret
-drawPixel endp
-
-;+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-;
-;    Draw horizontal
-;
-;+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-;proc borders
-
-    ;sub rsp, 40
-    ;xor CX, CX
-    ;xor R12, R12
-    ;xor R13, R13
-    ;mov R12, 79
-    ;mov R13, 24
-
-    
-proc horizontal
-
-     push DX                            ;push de DX, AX, CX para "proteger" o que estiver l�
-     push AX 
-     push CX
-     cicloH:  
-         cmp CX,AX
-         jg fimH 
-         call drawPixel
-         inc CX
-         jmp cicloH
-     fimH:
-     pop CX
-     pop AX
-     pop DX
-     ret
-endp horizontal
-
-
-   ;mov CX, "#"
-   ;call putchar
-   ;dec R12
-   ;cmp R12, 0
-   ;jnz firsthorizontal
-   ;
-   ;
-   ;xor CX, CX         ;vou fazer aqui o primeiro par�grafo
-   ;mov CX, 13
-   ;call putchar
-   ;xor CX, CX
-   ;
-   ;add R12, 79        ; para voltar a usar o mesmo registo na outra horizontal
-   ;add rsp, 40        ; Restore the stack pointer
-   ;xor eax, eax       ; Set return value to 0
-
-
-;+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-;
-;    Draw vertical
-;
-;+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-proc vertical
-
-    push DX
-    push BX 
-    push CX
-    cicloV:  
-        cmp DX,BX
-        jg fimV 
-        call drawPixel
-        inc DX
-        jmp cicloV
-    fimV:
-    pop CX
-    pop BX
-    pop DX
-    ret
-endp vertical
-
-
-   ;mov CX, "*"
-   ;call putchar
-   ;dec R13
-   ;cmp R13, 0
-   ;jnz firstvertical
-   ;xor CX, CX
-   ;add R13, 24        ; para voltar a usar o mesmo registo na outra horizontal
-   ;add rsp, 40        ; Restore the stack pointer
-   ;xor eax, eax       ; Set return value to 0
-
-   ;borders endp
-
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;                           STRLEN; refazer
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-proc strLen 
-    push si
-    mov cx, 0
-    loopSL: 
-        mov al, byte ptr [si]
-        or al, al       
-        jz endSL
-        inc si
-        inc cx
-        jmp loopSL
-    endSL:
-        pop si
-        ret 
-endp
-
-
-
 main proc
+    sub rsp, 40             
 
-    call graphicMode
-    call borders
+    ; 1. INICIALIZAÇÃO
+    mov rcx, STD_OUTPUT_HANDLE
+    call GetStdHandle
+    mov hStdOut, rax
 
-ret
+    mov rcx, STD_INPUT_HANDLE
+    call GetStdHandle
+    mov hStdIn, rax
+
+    lea rcx, tituloJanela
+    call SetConsoleTitleA
+
+    mov rcx, hStdOut
+    lea rdx, cursorInfo
+    call SetConsoleCursorInfo
+
+    ; 2. TELA DE INÍCIO
+    lea rbx, msgStart       ; RBX é seguro usar aqui
+PrintLoop:
+    xor rcx, rcx            ; Limpa RCX
+    mov cl, [rbx]           ; Pega apenas o byte do char
+    test cl, cl             ; É zero (fim da string)?
+    jz WaitKey
+
+    call putchar
+    inc rbx
+    jmp PrintLoop
+
+WaitKey:
+    call _kbhit
+    test eax, eax
+    jz WaitKey 
+
+    call _getch             ; Consome a tecla pressionada
+
+    ; 3. LOOP DO JOGO
+GameLoop:
+    ; A. Apagar rastro (Desenha espaço na posição atual)
+    call MoverCursor
+    mov rcx, 32             ; ASCII Space
+    call putchar
+
+    ; B. Input
+    ; DIREITA (VK_RIGHT = 0x27)
+    mov rcx, 27h 
+    call GetAsyncKeyState
+    test ax, 8000h          ; Bit mais significativo indica tecla pressionada
+    jnz MoveRight
+
+    ; ESQUERDA (VK_LEFT = 0x25)
+    mov rcx, 25h
+    call GetAsyncKeyState
+    test ax, 8000h
+    jnz MoveLeft
+
+    jmp Render
+
+MoveRight:
+    inc posX
+    jmp Render
+MoveLeft:
+    dec posX
+    jmp Render
+
+    ; C. Renderizar (Desenha 'O' na nova posição)
+Render:
+    call MoverCursor    
+    
+    mov rcx, 'O'        
+    call putchar
+
+    ; D. Timing
+    mov rcx, 100        
+    call Sleep
+
+    jmp GameLoop        
+
+    ; FIM
+    mov rcx, 0
+    call ExitProcess
 main endp
+
+; --------------------------------------------------------------------
+; Procedimento Auxiliar: MoverCursor
+; --------------------------------------------------------------------
+MoverCursor proc
+    ; ================================================================
+    ; PROTEÇÃO DE REGISTRADORES (ABI x64)
+    ; RBX é "Non-volatile". Se usarmos, temos que salvar e restaurar.
+    ; ================================================================
+    push rbx                ; Salva o valor original de RBX
+
+    ; Formatar RDX como 0x00YYXXXX (COORD)
+    
+    ; 1. Tratar Y (High part)
+    xor rax, rax
+    mov al, posY
+    shl eax, 16             ; Move Y para os bits superiores
+
+    ; 2. Tratar X (Low part)
+    xor rbx, rbx
+    mov bl, posX            ; X fica nos bits inferiores
+
+    ; 3. Combinar
+    or rax, rbx             ; EAX agora é Y << 16 | X
+    
+    ; 4. Chamar API
+    mov rcx, hStdOut        ; Handle
+    mov rdx, rax            ; Posição (passada por valor no RDX)
+    call SetConsoleCursorPosition
+
+    pop rbx                 ; Restaura RBX (Crucial para não crashar main)
+    ret
+MoverCursor endp
 
 end

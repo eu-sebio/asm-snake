@@ -60,9 +60,9 @@ CONSOLE_CURSOR_INFO ENDS
 
 .code
 main proc
+
     sub rsp, 40             
 
-    ; 1. INICIALIZAÇÃO
     mov rcx, STD_OUTPUT_HANDLE
     call GetStdHandle
     mov hStdOut, rax
@@ -101,19 +101,65 @@ main endp
 
 
 
-;gameWindow proc
-;
-;    sub rsp, 40
-;
-;    
-;    
-;    
-;
-;
-;    add rsp, 40
-;    ret
-;gameWindow endp
+gameWindow proc
 
+    sub rsp, 40
+    
+    mov counter, 0
+    mov posX, 0
+    mov posY, 0
+    mov rbx, 23h
+
+    Horizontal1:
+        call moverCursor
+        mov rcx, rbx           
+        call putchar
+        cmp counter, 79
+        jne IncrementarX
+        cmp posY, 0
+        jne IrParaVertical
+
+        mov posX, 0             
+        mov posY, 24
+        mov counter, 0
+        jmp Horizontal1         
+
+    IncrementarX:
+        inc counter
+        inc posX
+        jmp Horizontal1         
+    
+    IrParaVertical:
+        mov posX, 0
+        mov posY, 0
+        mov counter, 0
+        jmp Vertical1
+    
+    Vertical1: 
+        call moverCursor
+        mov rcx, rbx
+        call putchar
+        cmp counter, 24
+        jne IncrementarY
+        cmp posX, 0
+        jne Fim
+        mov posX, 79
+        mov posY, 0
+        mov counter, 0
+        jmp Vertical1
+    
+    IncrementarY:
+        inc counter
+        inc posY
+        jmp Vertical1
+
+    Fim:
+    mov posX, 40
+    mov posY, 12
+
+    add rsp, 40
+    ret
+gameWindow endp
 
 cursor proc
     ; =========================================================================

@@ -1,6 +1,7 @@
 includelib ucrt.lib
 includelib legacy_stdio_definitions.lib
 includelib user32.lib 
+includelib msvcrt.lib
 
 ; --- Funções do Windows ---
 extrn GetStdHandle : proc
@@ -11,6 +12,9 @@ extrn ReadConsoleInputA : proc
 extrn GetAsyncKeyState : proc     
 extrn Sleep : proc                   
 extrn ExitProcess : proc
+extrn rand : proc
+extrn srand : proc
+extrn time : proc
 
 ; --- Funções de C ---
 extrn _kbhit : proc
@@ -31,17 +35,21 @@ CONSOLE_CURSOR_INFO ENDS
     
     ; Strings
     tituloJanela db "SNAKE GAME", 0
-    msgStart1 db "Your goal is to eat the fruit () to add points, and as you add points the snake becomes longer", 0
-    msgStart2 db "To change directions use the arrow keys or AWSD", 0
-    msgStart3 db "Press any key to start", 0
+    msgStart0 db "                                           --- Welcome to the Snake Game ---                                    ", 0
+    msgStart1 db "               -> Your goal is to eat the fruit (*) to add points, and as your score increases the snake becomes longer", 0
+    msgStart15 db "               -> You lose by biting yourself or the walls, so be careful!! (The Snake is vegan)", 0
+    msgStart2 db "               -> To change directions use the arrow keys or AWSD                                               ", 0
+    msgStart3 db "                                                   Press any key to start                                           ", 0
+    apagaTexto db "                                                                                                                                      ", 0
     
     ; Variáveis
     hStdOut      qword 0
     hStdIn       qword 0
+    counter      db 0
     
     cursorInfo   CONSOLE_CURSOR_INFO <100, 0> 
 
-    ; Posição da Cobra
+    ; Posição do cursor
     posX         byte 40
     posY         byte 12
 
@@ -59,32 +67,53 @@ main proc
     call GetStdHandle
     mov hStdOut, rax
 
+    ;--- Seed para a função de randomização
+    mov rcx, 0
+    call time
+    mov rcx, rax
+    call srand
+
+
     lea rcx, tituloJanela
     call SetConsoleTitleA
 
     call cursor
     call mensagemInicial
-    mov currentDir, 3                ; chamar aqui a função random
+    ;call gameWindow
+
+    ;--- Direção random da Snake
+    call rand           ; Gera número
+    and rax, 3          ; Filtra para 0-3
+    inc rax
+    mov currentDir, al                ; chamar aqui a função random
+
+
+
     call game
 
     mov rcx, 0
     call ExitProcess
 main endp
+
 ;;;;;;;;;;;;;;;;;  END OF MAIN ;;;;;;;;;;;;;;;;;
 
 
 
 
 
-;window proc
-
+;gameWindow proc
+;
 ;    sub rsp, 40
-
-
-
-
+;
+;    
+;    
+;    
+;
+;
 ;    add rsp, 40
 ;    ret
+;gameWindow endp
+
 
 cursor proc
     ; =========================================================================
@@ -140,7 +169,7 @@ mensagemInicial proc
     ; =========================================================================
     sub rsp, 40
 
-    lea rbx, msgStart1      ; Carrega a primeira frase
+    lea rbx, msgStart0      ; Carrega a primeira frase
     Loop1:
         xor rcx, rcx
         mov cl, [rbx]
@@ -153,8 +182,11 @@ mensagemInicial proc
     paragrafo:
         mov rcx, 10             
         call putchar
+        mov rcx, 10             
+        call putchar
 
-     lea rbx, msgStart2
+
+     lea rbx, msgStart1
      Loop2:
          xor rcx, rcx
          mov cl, [rbx]
@@ -167,18 +199,46 @@ mensagemInicial proc
      paragrafo2:
         mov rcx, 10             
         call putchar
+
+     lea rbx, msgStart15
+     Loop15:
+         xor rcx, rcx
+         mov cl, [rbx]
+         test cl, cl
+         jz paragrafo15              ; Acabou linha 2? Espera tecla
+         call putchar
+         inc rbx
+         jmp Loop15
+
+     paragrafo15:
+        mov rcx, 10             
+        call putchar
+     
+    lea rbx, msgStart2      ; Carrega a primeira frase
+    Loop3:
+        xor rcx, rcx
+        mov cl, [rbx]
+        test cl, cl
+        jz paragrafo3          ; Acabou a linha 1? Vai dar o Enter
+        call putchar
+        inc rbx
+        jmp Loop3
+
+     paragrafo3:
+        mov rcx, 10             
+        call putchar
         mov rcx, 10             
         call putchar
 
      lea rbx, msgStart3
-     Loop3:
+     Loop4:
          xor rcx, rcx
          mov cl, [rbx]
          test cl, cl
          jz WaitKey              ; Acabou linha 2? Espera tecla
          call putchar
          inc rbx
-         jmp Loop3
+         jmp Loop4
 
     ; =========================================================================
     ; PARTE 3: ESPERAR PELO JOGADOR
@@ -190,6 +250,74 @@ WaitKey:
     
     test eax, eax           ; Compara o retorno.
     jz WaitKey              ; Se for 0 (ninguém tocou em nada), repete o loop infinitamente.
+    
+
+    ; --- Apagar as instruções do ecrã assim que houver clique---
+
+    Linha0:
+        mov posX, 0
+        mov posY, 0
+        call moverCursor        ; Vai para (0,0)
+        lea rbx, apagaTexto     ; Carrega a "borracha"
+        inc counter
+        jmp Apagar   ; Escreve espaços
+
+    Linha1:
+        mov posX, 0
+        mov posY, 2
+        call moverCursor        ; Vai para (0,0)
+        lea rbx, apagaTexto     ; Carrega a "borracha"
+        inc counter
+        jmp Apagar   ; Escreve espaços
+
+     Linha15:
+        mov posX, 0
+        mov posY, 3
+        call moverCursor        ; Vai para (0,0)
+        lea rbx, apagaTexto     ; Carrega a "borracha"
+        inc counter
+        jmp Apagar   ; Escreve espaços
+    
+    Linha2:
+        mov posX, 0
+        mov posY, 4             
+        call moverCursor        
+        lea rbx, apagaTexto
+        inc counter
+        jmp Apagar   
+
+    Linha3:
+        mov posX, 0
+        mov posY, 6             
+        call moverCursor        
+        lea rbx, apagaTexto
+        inc counter
+        jmp Apagar
+
+    Apagar:
+        xor rcx, rcx
+        mov cl, [rbx]
+        test cl, cl
+        jz FimApagar
+        call putchar
+        inc rbx
+        jmp Apagar
+
+    FimApagar:
+        cmp counter, 1
+        je Linha1
+        cmp counter, 2
+        je Linha15
+        cmp counter, 3
+        je Linha2
+        cmp counter, 4
+        je Linha3
+
+   ; --- Preparar a posição da cobra ---    
+    mov posX, 40
+    mov posY, 12
+    mov counter, 0
+
 
     call _getch             ; Se chegamos aqui, alguém tocou numa tecla!
                             ; Chamamos _getch para "comer" essa tecla e limpar o buffer.
@@ -317,6 +445,9 @@ Render:
     add rsp, 40
     ret
 game endp
+
+
+end
 
 
 end

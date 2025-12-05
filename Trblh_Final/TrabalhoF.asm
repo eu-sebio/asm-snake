@@ -97,9 +97,45 @@ main endp
 
 ;;;;;;;;;;;;;;;;;  END OF MAIN ;;;;;;;;;;;;;;;;;
 
+foodRandomizer proc
 
+    sub rsp, 40
+   
+   ;--- salva os dados que podem afetar a Snake
+    xor rax, rax
+    mov al, posX
+    push rax
+    mov al, posY
+    push rax
+    
+    mov rbx, 2Ah
 
+    call rand
+    xor rdx, rdx
+    mov rcx, 78
+    div rcx
+    inc rdx
+    mov posX, dl
 
+    call rand
+    xor rdx, rdx
+    mov rcx, 23
+    div rcx
+    inc rdx
+    mov posY, dl
+
+    call moverCursor
+    mov rcx, rbx
+    call putchar
+
+    pop rax
+    mov posY, al
+    pop rax
+    mov posX, al
+
+    add rsp, 40
+    ret
+foodRandomizer endp
 
 gameWindow proc
 

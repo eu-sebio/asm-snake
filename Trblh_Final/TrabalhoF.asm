@@ -37,9 +37,9 @@ CONSOLE_CURSOR_INFO ENDS
     ; Strings
     tituloJanela db "SNAKE GAME", 0
     msgStart0 db "                                           --- Welcome to the Snake Game ---                                    ", 0
-    msgStart1 db "               -> Your goal is to eat the fruit (*) to add points, and as your score increases the snake becomes longer", 0
-    msgStart15 db "               -> You lose by biting yourself or the walls, so be careful!! (The Snake is vegan)", 0
-    msgStart2 db "               -> To change directions use the arrow keys or AWSD                                               ", 0
+    msgStart1 db "            -> Your goal is to eat the fruit (*) to add points, and as your score increases so does the Snake!", 0
+    msgStart15 db "            -> You lose by biting yourself or the walls, so be careful!! (The Snake is vegan)", 0
+    msgStart2 db "            -> To change directions use the arrow keys or AWSD                                               ", 0
     msgStart3 db "                                                   Press any key to start                                           ", 0
     apagaTexto db "                                                                                                                                                  ", 0
     printedScore db "Score: %d   ", 10, 0
@@ -333,81 +333,51 @@ moverCursor endp
 mensagemInicial proc
     sub rsp, 40
 
-    lea rbx, msgStart0      ; Carrega a primeira frase
-    Loop1:
-        xor rcx, rcx
-        mov cl, [rbx]
-        test cl, cl
-        jz paragrafo          ; Acabou a linha 1? Vai dar o Enter
-        call putchar
-        inc rbx
-        jmp Loop1
+    mov posX, 0
+    mov posY, 10
+    call moverCursor
+    lea rbx, msgStart0      ; Carrega a frase
+    call ImprimirFraseAtual ; Chama a rotina que imprime o que está em RBX
 
-    paragrafo:
-        mov rcx, 10             
-        call putchar
-        mov rcx, 10             
-        call putchar
+    mov posX, 0
+    mov posY, 13
+    call moverCursor
+    lea rbx, msgStart1
+    call ImprimirFraseAtual
+
+    mov posX, 0
+    mov posY, 14
+    call moverCursor
+    lea rbx, msgStart15
+    call ImprimirFraseAtual
+
+    mov posX, 0
+    mov posY, 15
+    call moverCursor
+    lea rbx, msgStart2
+    call ImprimirFraseAtual
+
+    mov posX, 0
+    mov posY, 18
+    call moverCursor
+    lea rbx, msgStart3
+    call ImprimirFraseAtual
+
+    jmp WaitKey
+
+ImprimirFraseAtual:
+    xor rcx, rcx
+    mov cl, [rbx]
+    test cl, cl
+    jz FimImprimir      ; Se for 0, acabou esta frase
+    call putchar
+    inc rbx
+    jmp ImprimirFraseAtual
+FimImprimir:
+    ret
 
 
-     lea rbx, msgStart1
-     Loop2:
-         xor rcx, rcx
-         mov cl, [rbx]
-         test cl, cl
-         jz paragrafo2              ; Acabou linha 2? Espera tecla
-         call putchar
-         inc rbx
-         jmp Loop2
-
-     paragrafo2:
-        mov rcx, 10             
-        call putchar
-
-     lea rbx, msgStart15
-     Loop15:
-         xor rcx, rcx
-         mov cl, [rbx]
-         test cl, cl
-         jz paragrafo15              ; Acabou linha 2? Espera tecla
-         call putchar
-         inc rbx
-         jmp Loop15
-
-     paragrafo15:
-        mov rcx, 10             
-        call putchar
-     
-    lea rbx, msgStart2      ; Carrega a primeira frase
-    Loop3:
-        xor rcx, rcx
-        mov cl, [rbx]
-        test cl, cl
-        jz paragrafo3          ; Acabou a linha 1? Vai dar o Enter
-        call putchar
-        inc rbx
-        jmp Loop3
-
-     paragrafo3:
-        mov rcx, 10             
-        call putchar
-        mov rcx, 10             
-        call putchar
-
-     lea rbx, msgStart3
-     Loop4:
-         xor rcx, rcx
-         mov cl, [rbx]
-         test cl, cl
-         jz WaitKey              ; Acabou linha 2? Espera tecla
-         call putchar
-         inc rbx
-         jmp Loop4
-
-    ; =========================================================================
-    ; PARTE 3: ESPERAR PELO JOGADOR
     ; O jogo fica parado aqui até alguém carregar numa tecla.
-    ; =========================================================================
 WaitKey:
     call _kbhit             ; Verifica: "Há alguma tecla no buffer?" (Não bloqueia)
                             ; Retorna 1 em EAX se houver, 0 se não houver.
@@ -418,64 +388,19 @@ WaitKey:
 
     ; --- Apagar as instruções do ecrã assim que houver clique---
 
-    Linha0:
+mov r12, 0
+    LimparInicio:
         mov posX, 0
-        mov posY, 0
-        call moverCursor        ; Vai para (0,0)
-        lea rbx, apagaTexto     ; Carrega a "borracha"
-        inc counter
-        jmp Apagar   ; Escreve espaços
-
-    Linha1:
-        mov posX, 0
-        mov posY, 2
-        call moverCursor        ; Vai para (0,0)
-        lea rbx, apagaTexto     ; Carrega a "borracha"
-        inc counter
-        jmp Apagar   ; Escreve espaços
-
-     Linha15:
-        mov posX, 0
-        mov posY, 3
+        mov rax, r12
+        mov posY, al
         call moverCursor
-        lea rbx, apagaTexto
-        inc counter
-        jmp Apagar   ; Escreve espaços
-    
-    Linha2:
-        mov posX, 0
-        mov posY, 4             
-        call moverCursor        
-        lea rbx, apagaTexto
-        inc counter
-        jmp Apagar   
+        
+        lea rcx, apagaTexto
+        call printf
 
-    Linha3:
-        mov posX, 0
-        mov posY, 6             
-        call moverCursor        
-        lea rbx, apagaTexto
-        inc counter
-        jmp Apagar
-
-    Apagar:
-        xor rcx, rcx
-        mov cl, [rbx]
-        test cl, cl
-        jz FimApagar
-        call putchar
-        inc rbx
-        jmp Apagar
-
-    FimApagar:
-        cmp counter, 1
-        je Linha1
-        cmp counter, 2
-        je Linha15
-        cmp counter, 3
-        je Linha2
-        cmp counter, 4
-        je Linha3
+        inc r12
+        cmp r12, 26
+        jl LimparInicio
 
    ; --- Preparar a posição da cobra ---    
     mov posX, 40
@@ -646,9 +571,6 @@ ContinuaMovimento:
         add rsp, 40
         ret
 game endp
-
-
-end
 
 
 end

@@ -15,6 +15,7 @@ extrn ExitProcess : proc
 extrn rand : proc
 extrn srand : proc
 extrn time : proc
+extrn printf : proc
 
 ; --- Funções de C ---
 extrn _kbhit : proc
@@ -40,21 +41,30 @@ CONSOLE_CURSOR_INFO ENDS
     msgStart15 db "               -> You lose by biting yourself or the walls, so be careful!! (The Snake is vegan)", 0
     msgStart2 db "               -> To change directions use the arrow keys or AWSD                                               ", 0
     msgStart3 db "                                                   Press any key to start                                           ", 0
-    apagaTexto db "                                                                                                                                      ", 0
+    apagaTexto db "                                                                                                                                                  ", 0
+    printedScore db "Score: %d   ", 10, 0
+    msgEnd0 db "                                                   --- Game over ---", 0
+    msgEnd1 db "                                                  -> Your Score is: %d ", 10, 0
+    msgEnd2 db "                                            Press any key to leave (Bye bye)", 0
     
     ; Variáveis
-    hStdOut      qword 0
-    hStdIn       qword 0
-    counter      db 0
-    
+    hStdOut qword 0
+    hStdIn qword 0
+    counter db 0
+    speed db 100
+    points qword 0
+
     cursorInfo   CONSOLE_CURSOR_INFO <100, 0> 
 
     ; Posição do cursor
-    posX         byte 40
-    posY         byte 12
+    posX byte 40
+    posY byte 12
+
+    foodX byte 0
+    foodY byte 0
 
     ;variavel para saber a direçao
-    currentDir   byte 0   ; 1=Left, 2=Up, 3=Right, 4=Down
+    currentDir   byte 0   ; 0=Left, 1=Up, 2=Right, 3=Down
 
 ;;;;;;;;;;;;;;;;;     CODE    ;;;;;;;;;;;;;;;;;;
 
@@ -79,35 +89,116 @@ main proc
 
     call cursor
     call mensagemInicial
-    ;call gameWindow
+    call gameWindow
+    call foodRandomizer
+    call scoreBoard
 
     ;--- Direção random da Snake
     call rand           ; Gera número
     and rax, 3          ; Filtra para 0-3
-    inc rax
     mov currentDir, al                ; chamar aqui a função random
 
 
 
     call game
-
+    call endingScreen
     mov rcx, 0
     call ExitProcess
 main endp
 
 ;;;;;;;;;;;;;;;;;  END OF MAIN ;;;;;;;;;;;;;;;;;
 
-foodRandomizer proc
 
+endingScreen proc
+    sub rsp, 40
+    mov r12, 0
+    Apaga:
+        mov posX, 0
+        mov rax, r12
+        mov posY, al
+        call moverCursor
+        
+        lea rcx, apagaTexto
+        call printf
+
+        inc r12
+        cmp r12, 26
+        jl Apaga
+
+    lea rbx, msgEnd0
+    mov posX, 0
+    mov posY, 10
+    call moverCursor
+    lea rcx, msgEnd0
+    call printf
+
+    mov posX, 0
+    mov posY, 13
+    call moverCursor
+    lea rcx, msgEnd1        ; "Your Score is: %d"
+    mov rdx, points         ; Passamos o valor dos pontos para RDX
+    call printf             ; O printf substitui o %d pelo valor de RDX
+    
+    mov posX, 0
+    mov posY, 16
+    call moverCursor
+    lea rcx, msgEnd2
+    call printf
+
+ClearLastKey:
+    call _kbhit             ; Há tecla no buffer?
+    test eax, eax
+    jz WaitKey              ; Se não (0), pode ir esperar
+    call _getch             ; Se sim, consome a tecla (deita fora)
+    jmp ClearLastKey           ; Repete até limpar tudo
+
+WaitKey:
+    call _kbhit 
+    test eax, eax           
+    jz WaitKey
+    call _getch
+
+    add rsp, 40
+    ret
+endingScreen endp
+
+scoreBoard proc
+    push r12
+    push r13
+    sub rsp, 40
+
+    movzx r12, posX
+    movzx r13, posY
+
+    mov posX, 2
+    mov posY, 26
+    call moverCursor
+    lea rcx, printedScore
+    mov rdx, points
+    call printf
+
+    mov rax, r13
+    mov posY, al
+    mov rax, r12
+    mov posX, al
+
+    add rsp, 40
+    pop r13
+    pop r12
+
+    ret
+scoreBoard endp
+
+foodRandomizer proc
+    push r12
+    push r13
     sub rsp, 40
    
-   ;--- salva os dados que podem afetar a Snake
-    xor rax, rax
-    mov al, posX
-    push rax
-    mov al, posY
-    push rax
     
+    ;--- salva os dados que podem afetar a Snake
+    movzx r12, posX
+    movzx r13, posY
+
     mov rbx, 2Ah
 
     call rand
@@ -116,6 +207,7 @@ foodRandomizer proc
     div rcx
     inc rdx
     mov posX, dl
+    mov foodX, dl
 
     call rand
     xor rdx, rdx
@@ -123,22 +215,25 @@ foodRandomizer proc
     div rcx
     inc rdx
     mov posY, dl
+    mov foodY, dl
 
     call moverCursor
     mov rcx, rbx
     call putchar
 
-    pop rax
+    mov rax, r13
     mov posY, al
-    pop rax
+    mov rax, r12
     mov posX, al
-
+    
     add rsp, 40
+    pop r13
+    pop r12
     ret
 foodRandomizer endp
 
-gameWindow proc
 
+gameWindow proc
     sub rsp, 40
     
     mov counter, 0
@@ -190,19 +285,14 @@ gameWindow proc
         jmp Vertical1
 
     Fim:
-    mov posX, 40
-    mov posY, 12
+        mov posX, 40
+        mov posY, 12
 
     add rsp, 40
     ret
 gameWindow endp
 
 cursor proc
-    ; =========================================================================
-    ; PARTE 1: PREPARAÇÃO DO AMBIENTE
-    ; O objetivo aqui é esconder aquele cursor que fica a piscar "_" na consola
-    ; para o jogo ficar mais limpo visualmente.
-    ; =========================================================================
     sub rsp, 40
 
     mov rcx, hStdOut        ; RCX = Identificador da janela da consola (ecrã)
@@ -213,10 +303,6 @@ cursor proc
     ret
 
 cursor endp
-
-; ====================================================================
-; Mover Cursor do Windows
-; ====================================================================
 
 moverCursor proc
     push rbx                ; Salva o valor original de RBX
@@ -245,10 +331,6 @@ moverCursor proc
 moverCursor endp
 
 mensagemInicial proc
-    ; =========================================================================
-    ; PARTE 2: ESCREVER A MENSAGEM INICIAL
-    ; Aqui usamos um loop para imprimir caractere por caractere.
-    ; =========================================================================
     sub rsp, 40
 
     lea rbx, msgStart0      ; Carrega a primeira frase
@@ -355,8 +437,8 @@ WaitKey:
      Linha15:
         mov posX, 0
         mov posY, 3
-        call moverCursor        ; Vai para (0,0)
-        lea rbx, apagaTexto     ; Carrega a "borracha"
+        call moverCursor
+        lea rbx, apagaTexto
         inc counter
         jmp Apagar   ; Escreve espaços
     
@@ -514,18 +596,55 @@ GoDown:
     ; --- D. RENDERIZAR ---
 Render:
     call moverCursor
-    mov rcx, '@'            ; Cobra
+    mov rcx, '@'            ; cabeça da Snake
     call putchar
 
+    ;--- verifica se a fruta foi comida
+
+    mov al, posX            ; Carrega X da Cobra
+    cmp al, foodX           ; Compara com X da Comida
+    jne WallCollision            ; Se forem diferentes, salta
+
+    ; 2. Comparar Y da Cobra com Y da Comida
+    mov al, posY            ; Carrega Y da Cobra
+    cmp al, foodY           ; Compara com Y da Comida
+    jne WallCollision            ; Se forem diferentes, salta
+
+    call foodRandomizer     ; Gera uma nova fruta imediatamente
+    inc qword ptr [points]
+    call scoreBoard
+
+    IncreaseSpeed:
+        mov rax, points
+        xor rdx, rdx
+        mov rbx, 6
+        div rbx
+        cmp rdx, 0
+        jne WallCollision
+        dec speed
+
+    WallCollision:
+        cmp posX, 0
+        je GameOver
+        cmp posX, 79
+        je GameOver
+
+        cmp posY, 0
+        je GameOver
+        cmp posY, 24
+        je GameOver
+
+
+ContinuaMovimento:
     ; --- E. VELOCIDADE ---
-    mov rcx, 100            ; 100ms
+    movzx rcx, speed            ; 100ms initially
     call Sleep
 
     jmp GameLoop            ; Repete para sempre
 
-    ; (Este ponto nunca é atingido num loop infinito)
-    add rsp, 40
-    ret
+    GameOver:
+        add rsp, 40
+        ret
 game endp
 
 

@@ -56,17 +56,21 @@ CONSOLE_CURSOR_INFO ENDS
 
     cursorInfo   CONSOLE_CURSOR_INFO <100, 0> 
 
-    ; Posição do cursor
+    ;posição inicial
     posX byte 40
     posY byte 12
 
     foodX byte 0
     foodY byte 0
 
+    ;cobra
+    SnakeBody  dw 400 dup(0) ;200 segmentos * 2 coordenadas * 2 bytes por coordenada = 800 bytes
+    snakeLength qword 1 ;começa só com a cabeça
+
     ;variavel para saber a direçao
     currentDir   byte 0   ; 0=Left, 1=Up, 2=Right, 3=Down
 
-;;;;;;;;;;;;;;;;;     CODE    ;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;CODE;;;;;;;;;;;;;
 
 .code
 main proc
@@ -98,7 +102,11 @@ main proc
     and rax, 3          ; Filtra para 0-3
     mov currentDir, al                ; chamar aqui a função random
 
-
+    ; Initialize the head in the array
+    movzx rax, posX
+    mov SnakeBody[0], ax    ; Store X at index 0
+    movzx rax, posY
+    mov SnakeBody[2], ax    ; Store Y at index 2 (Words are 2 bytes)
 
     call game
     call endingScreen
@@ -106,7 +114,6 @@ main proc
     call ExitProcess
 main endp
 
-;;;;;;;;;;;;;;;;;  END OF MAIN ;;;;;;;;;;;;;;;;;
 
 
 endingScreen proc
@@ -402,10 +409,7 @@ mov r12, 0
         cmp r12, 26
         jl LimparInicio
 
-   ; --- Preparar a posição da cobra ---    
-    mov posX, 40
-    mov posY, 12
-    mov counter, 0
+   
 
 
     call _getch             ; Se chegamos aqui, alguém tocou numa tecla!
@@ -417,84 +421,109 @@ mensagemInicial endp
 
 
 game proc
-
-    ; =========================================================================
-    ; PARTE 4: O LOOP DO JOGO (O CORAÇÃO)
-    ; A lógica aqui é: Apagar Posição Velha -> Calcular Nova -> Desenhar Nova
-    ; =========================================================================
     sub rsp, 40
 
 GameLoop:
-    ; --- A. APAGAR O RASTRO ---
-    ; Antes de movermos a cobra, temos de apagar onde ela estava no frame anterior.
+    ; --- 1. ERASE THE TAIL ---
+    ; We erase the very last segment of the snake before moving.
+    ; Unless we just ate? (For simplicity, we erase, if we ate we grow later)
     
-    call moverCursor        ; Move o cursor interno do Windows para (posX, posY)
+    ; Get index of last segment
+    mov rcx, snakeLength
+    dec rcx                 ; Zero-based index
+    shl rcx, 2              ; Multiply by 4 (size of X+Y in words)
     
-    mov rcx, 32             ; 32 é o código ASCII para ESPAÇO (' ')
-    call putchar            ; Escreve um espaço em branco.
-                            ; Visualmente, isto "apaga" o 'O' que estava lá.
+    ; Move cursor to Tail X, Y
+    xor rdx, rdx
+    xor rax, rax
+    
+    mov dx, SnakeBody[rcx]      ; Load Tail X
+    mov posX, dl                ; Set helper var for moverCursor
+    mov dx, SnakeBody[rcx+2]    ; Load Tail Y
+    mov posY, dl
+    
+    call moverCursor
+    mov rcx, 32                 ; ' ' Space
+    call putchar
 
-    ; --- B. VERIFICAR INPUT (Teclado) ---
-    ; Aqui usamos GetAsyncKeyState porque queremos saber se a tecla está 
-    ; pressionada AGORA, permitindo movimento contínuo e rápido.
+    ; --- 2. RESTORE HEAD COORDS FOR CALCULATION ---
+    ; Ensure posX/posY match the current Head (Index 0)
+    mov ax, SnakeBody[0]
+    mov posX, al
+    mov ax, SnakeBody[2]
+    mov posY, al
 
-     ; ESQUERDA (Seta ou A)
-    mov rcx, 25h
-    call GetAsyncKeyState   ; Pergunta ao Windows o estado dessa tecla
-    test ax, 8000h          ; O bit mais alto (8000h) diz se está pressionada agora.
-    jnz SetLeft             ; Se não clicou, verifica próxima
-    mov rcx, 41h            ; 'A'
+    ; --- 3. INPUT (Your existing logic) ---
+    mov rcx, 25h                ; Left Arrow
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetLeft
-
-   ; CIMA (Seta ou W)
-    mov rcx, 26h
+    
+    mov rcx, 26h                ; Up Arrow
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetUp
-    mov rcx, 57h            ; 'W'
+    
+    mov rcx, 27h                ; Right Arrow
+    call GetAsyncKeyState
+    test ax, 8000h
+    jnz SetRight
+    
+    mov rcx, 28h                ; Down Arrow
+    call GetAsyncKeyState
+    test ax, 8000h
+    jnz SetDown
+    
+    ; W, A, S, D support
+    mov rcx, 41h ; A
+    call GetAsyncKeyState
+    test ax, 8000h
+    jnz SetLeft
+    mov rcx, 57h ; W
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetUp
-
-    ; DIREITA (Seta ou D)
-    mov rcx, 27h
+    mov rcx, 44h ; D
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetRight
-    mov rcx, 44h            ; 'D'
-    call GetAsyncKeyState
-    test ax, 8000h
-    jnz SetRight
-
-    ; BAIXO (Seta ou S)
-    mov rcx, 28h
-    call GetAsyncKeyState
-    test ax, 8000h
-    jnz SetDown
-    mov rcx, 53h            ; 'S'
+    mov rcx, 53h ; S
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetDown
 
-    jmp ApplyMove           ; Nenhuma tecla nova? Mantém a direção atual
+    jmp ApplyMove
 
 SetLeft:
-    mov currentDir, 0
-    jmp ApplyMove
-SetUp:
-    mov currentDir, 1
-    jmp ApplyMove
-SetRight:
-    mov currentDir, 2
-    jmp ApplyMove
-SetDown:
-    mov currentDir, 3
+    cmp currentDir, 2       ; Are we currently going Right?
+    je ApplyMove            ; If yes, ignore this input (skip change)
+    mov currentDir, 0       ; Otherwise, set direction to Left
     jmp ApplyMove
 
-    ; --- C. APLICAR MOVIMENTO ---
+SetUp:
+    cmp currentDir, 3       ; Are we currently going Down?
+    je ApplyMove            ; If yes, ignore
+    mov currentDir, 1       ; Otherwise, set Up
+    jmp ApplyMove
+
+SetRight:
+    cmp currentDir, 0       ; Are we currently going Left?
+    je ApplyMove            ; If yes, ignore
+    mov currentDir, 2       ; Otherwise, set Right
+    jmp ApplyMove
+
+SetDown:
+    cmp currentDir, 1       ; Are we currently going Up?
+    je ApplyMove            ; If yes, ignore
+    mov currentDir, 3       ; Otherwise, set Down
+    jmp ApplyMove
+
 ApplyMove:
+    ; --- 4. SHIFT THE BODY ARRAY ---
+    ; Before we update posX/posY, we shift the body history
+    call UpdateBodyArr
+
+    ; --- 5. CALCULATE NEW HEAD POS ---
     cmp currentDir, 0
     je GoLeft
     cmp currentDir, 1
@@ -503,74 +532,161 @@ ApplyMove:
     je GoRight
     cmp currentDir, 3
     je GoDown
-    jmp Render
 
-GoLeft:
-    dec posX
-    jmp Render
-GoUp:
-    dec posY                ; Cima = Y menor
-    jmp Render
-GoRight:
-    inc posX
-    jmp Render
-GoDown:
-    inc posY                ; Baixo = Y maior
-    jmp Render
+GoLeft:  dec posX
+         jmp SaveHead
+GoUp:    dec posY
+         jmp SaveHead
+GoRight: inc posX
+         jmp SaveHead
+GoDown:  inc posY
+         jmp SaveHead
 
-    ; --- D. RENDERIZAR ---
-Render:
+SaveHead:
+    ; Store the new Head position into Array[0]
+    movzx rax, posX
+    mov SnakeBody[0], ax
+    movzx rax, posY
+    mov SnakeBody[2], ax
+
+    ; --- 6. CHECK COLLISIONS ---
+    
+    ; A. Self Collision
+    call CheckSelfCollision
+    cmp rax, 1
+    je GameOver
+
+    ; B. Wall Collision (Your existing logic)
+    cmp posX, 0
+    je GameOver
+    cmp posX, 79
+    je GameOver
+    cmp posY, 0
+    je GameOver
+    cmp posY, 24
+    je GameOver
+
+    ; --- 7. DRAW HEAD ---
     call moverCursor
-    mov rcx, '@'            ; cabeça da Snake
+    mov rcx, '@'
     call putchar
+    
+    ; Optional: Draw the "Neck" (Index 1) as 'o' to make head distinct
+    cmp snakeLength, 1
+    jle CheckFruit
+    
+    ; Move cursor to SnakeBody[4] (Index 1 X)
+    mov ax, SnakeBody[4]
+    mov posX, al
+    mov ax, SnakeBody[6]
+    mov posY, al
+    call moverCursor
+    mov rcx, 111       ; 'o'
+    call putchar
+    
+    ; Restore Head Pos for Fruit Check
+    mov ax, SnakeBody[0]
+    mov posX, al
+    mov ax, SnakeBody[2]
+    mov posY, al
 
-    ;--- verifica se a fruta foi comida
+    ; --- 8. FRUIT LOGIC ---
+CheckFruit:
+    mov al, posX
+    cmp al, foodX
+    jne DelayLoop
+    
+    mov al, posY
+    cmp al, foodY
+    jne DelayLoop
 
-    mov al, posX            ; Carrega X da Cobra
-    cmp al, foodX           ; Compara com X da Comida
-    jne WallCollision            ; Se forem diferentes, salta
-
-    ; 2. Comparar Y da Cobra com Y da Comida
-    mov al, posY            ; Carrega Y da Cobra
-    cmp al, foodY           ; Compara com Y da Comida
-    jne WallCollision            ; Se forem diferentes, salta
-
-    call foodRandomizer     ; Gera uma nova fruta imediatamente
+    ; --- ATE FRUIT ---
+    call foodRandomizer
     inc qword ptr [points]
+    
+    ; GROW THE SNAKE
+    cmp snakeLength, 200    ; Max Check
+    jge SkipGrow
+    inc snakeLength
+SkipGrow:
+    
     call scoreBoard
+    
+    ; Speed increase logic
+    mov rax, points
+    xor rdx, rdx
+    mov rbx, 6
+    div rbx
+    cmp rdx, 0
+    jne DelayLoop
+    dec speed
 
-    IncreaseSpeed:
-        mov rax, points
-        xor rdx, rdx
-        mov rbx, 6
-        div rbx
-        cmp rdx, 0
-        jne WallCollision
-        dec speed
-
-    WallCollision:
-        cmp posX, 0
-        je GameOver
-        cmp posX, 79
-        je GameOver
-
-        cmp posY, 0
-        je GameOver
-        cmp posY, 24
-        je GameOver
-
-
-ContinuaMovimento:
-    ; --- E. VELOCIDADE ---
-    movzx rcx, speed            ; 100ms initially
+DelayLoop:
+    movzx rcx, speed
     call Sleep
+    jmp GameLoop
 
-    jmp GameLoop            ; Repete para sempre
-
-    GameOver:
-        add rsp, 40
-        ret
+GameOver:
+    add rsp, 40
+    ret
 game endp
 
+UpdateBodyArr proc
+    cmp snakeLength, 1
+    jle EndUpdate
+    
+    mov rcx, snakeLength
+    dec rcx
+    
+    ShiftLoop:
+        mov rax, rcx
+        shl rax, 2
+        mov rbx, rax
+        sub rbx, 4
+        
+        mov dx, SnakeBody[rbx]
+        mov SnakeBody[rax], dx
+        mov dx, SnakeBody[rbx+2]
+        mov SnakeBody[rax+2], dx
+        
+        dec rcx
+        jnz ShiftLoop
+        
+    EndUpdate:
+    ret
+UpdateBodyArr endp
+
+CheckSelfCollision proc
+    cmp snakeLength, 4
+    jl NoCollision
+    
+    mov rcx, 1
+    
+    CheckLoop:
+        cmp rcx, snakeLength
+        jge NoCollision
+        
+        mov rax, rcx
+        shl rax, 2
+        
+        mov dx, SnakeBody[rax]
+        cmp dx, SnakeBody[0]
+        jne NextSeg
+        
+        mov dx, SnakeBody[rax+2]
+        cmp dx, SnakeBody[2]
+        jne NextSeg
+        
+        mov rax, 1
+        ret
+
+    NextSeg:
+        inc rcx
+        jmp CheckLoop
+
+    NoCollision:
+    xor rax, rax
+    ret
+CheckSelfCollision endp
 
 end

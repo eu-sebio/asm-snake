@@ -581,7 +581,7 @@ SaveHead:
     mov ax, SnakeBody[6]
     mov posY, al
     call moverCursor
-    mov rcx, 111       ; 'o'
+    mov rcx, 2Bh       ; 'o'
     call putchar
     
     ; Restore Head Pos for Fruit Check

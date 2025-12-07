@@ -200,39 +200,78 @@ foodRandomizer proc
     push r12
     push r13
     sub rsp, 40
-   
-    
-    ;--- salva os dados que podem afetar a Snake
-    movzx r12, posX
-    movzx r13, posY
 
-    mov rbx, 2Ah
+GenerateNewFruit:
 
+    ; Guardar posição atual
+    movzx r12, byte ptr posX
+    movzx r13, byte ptr posY
+
+    mov rbx, 2Ah            ; '*'
+
+    ; --------- RANDOM X ---------
     call rand
     xor rdx, rdx
     mov rcx, 78
     div rcx
-    inc rdx
-    mov posX, dl
-    mov foodX, dl
+    inc dl
+    mov byte ptr foodX, dl
 
+    ; --------- RANDOM Y ---------
     call rand
     xor rdx, rdx
     mov rcx, 23
     div rcx
-    inc rdx
-    mov posY, dl
-    mov foodY, dl
+    inc dl
+    mov byte ptr foodY, dl
+
+    ; --------- VALIDAR SE ESTÁ EM CIMA DA COBRA ---------
+    xor rcx, rcx
+
+CheckIfOnSnake:
+    cmp rcx, snakeLength
+    jae PositionOK
+
+    mov rax, rcx
+    shl rax, 2
+
+    ; comparar X
+    mov ax, WORD PTR SnakeBody[rax]
+    xor bx, bx
+    mov bl, byte ptr foodX
+    cmp ax, bx
+    jne NextSeg
+
+    ; comparar Y
+    mov ax, WORD PTR SnakeBody[rax+2]
+    xor bx, bx
+    mov bl, byte ptr foodY
+    cmp ax, bx
+    jne NextSeg
+
+    ; fruta caiu em cima da cobra ? gerar outra
+    jmp GenerateNewFruit
+
+NextSeg:
+    inc rcx
+    jmp CheckIfOnSnake
+
+PositionOK:
+
+    ; --------- DESENHAR FRUTA ---------
+    mov al, byte ptr foodX
+    mov byte ptr posX, al
+    mov al, byte ptr foodY
+    mov byte ptr posY, al
 
     call moverCursor
-    mov rcx, rbx
+    mov rcx, 2Ah     ; '*'
     call putchar
 
-    mov rax, r13
-    mov posY, al
-    mov rax, r12
-    mov posX, al
-    
+    ; --------- RESTAURAR POS ---------
+    mov byte ptr posX, r12b
+    mov byte ptr posY, r13b
+
     add rsp, 40
     pop r13
     pop r12

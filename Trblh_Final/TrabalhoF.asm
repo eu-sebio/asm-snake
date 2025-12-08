@@ -124,7 +124,9 @@ main proc
 main endp
 
 
-
+;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
+;   IMPRIME A MENSAGEM FINAL                                 +
+;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 endingScreen proc
     sub rsp, 40
     mov r12, 0
@@ -178,6 +180,9 @@ WaitKey:
     ret
 endingScreen endp
 
+;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
+;   IMPRIME UM CONTADOR DE PONTUAÇÃO                         +
+;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 scoreBoard proc
     push r12
     push r13
@@ -205,6 +210,9 @@ scoreBoard proc
     ret
 scoreBoard endp
 
+;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
+;   GERA FRUTA NUM SSITIO ALEATÓRIO DENTRO DAS PAREDES       +
+;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 foodRandomizer proc
     push r12
     push r13
@@ -287,7 +295,9 @@ PositionOK:
     ret
 foodRandomizer endp
 
-
+;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
+;   IMPRIME AS PAREDES                                       +
+;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 gameWindow proc
     sub rsp, 40
     
@@ -348,7 +358,7 @@ gameWindow proc
 gameWindow endp
 
 ;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
-;   RECONHECE O CURSOR                               +
+;   RECONHECE O CURSOR                                       +
 ;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 cursor proc
     sub rsp, 40
@@ -392,7 +402,7 @@ moverCursor proc
 moverCursor endp
 
 ;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
-;   PERMITE MOVER O CURSOR                                   +
+;   IMPRIME A MENSAGEM INICIAL                               +
 ;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 mensagemInicial proc
     sub rsp, 40
@@ -446,7 +456,6 @@ ImprimirFraseAtual:
     FimImprimir:
         ret
 
-
     ; O jogo fica parado aqui até alguém carregar numa tecla.
 
 WaitKey:
@@ -479,7 +488,7 @@ mov r12, 0
 mensagemInicial endp
 
 ;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
-;   MECÂNICA DO JOGO                                  +
+;   MECÂNICA DO JOGO                                         +
 ;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 game proc
     sub rsp, 40
@@ -687,6 +696,9 @@ GameOver:
     ret
 game endp
 
+;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
+;   ATUALIZA O ARRAY DO CORPO DA SNAKE                       +
+;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 UpdateBodyArr proc
     cmp snakeLength, 1
     jle EndUpdate
@@ -712,6 +724,9 @@ UpdateBodyArr proc
     ret
 UpdateBodyArr endp
 
+;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
+;   VERIFICA SE OCORREU UMA COLISÃO COM O PRÓPRIO CORPO      +
+;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 CheckSelfCollision proc
     cmp snakeLength, 4
     jl NoCollision

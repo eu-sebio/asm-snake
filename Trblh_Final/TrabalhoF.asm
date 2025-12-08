@@ -646,7 +646,11 @@ CheckFruit:
     ; GROW THE SNAKE
     cmp snakeLength, 200    ; Max Check
     jge SkipGrow
-    inc snakeLength
+    cmp speed, 5
+    je IncSnakeLenght
+    sub speed, 5
+    IncSnakeLenght:
+        inc snakeLength
 SkipGrow:
     
     call scoreBoard

@@ -164,11 +164,11 @@ endingScreen proc
     call printf
 
 ClearLastKey:
-    call _kbhit             ; Há tecla no buffer?
+    call _kbhit             ; verifica se há alguma tecla no buffer
     test eax, eax
-    jz WaitKey              ; Se não (0), pode ir esperar
-    call _getch             ; Se sim, consome a tecla (deita fora)
-    jmp ClearLastKey           ; Repete até limpar tudo
+    jz WaitKey              ;se der zero então vai para o ciclo de espera
+    call _getch             ; se houver, então limpa o buffer
+    jmp ClearLastKey        ; repete para garantir que limpa tudo
 
 WaitKey:
     call _kbhit 
@@ -363,41 +363,39 @@ gameWindow endp
 cursor proc
     sub rsp, 40
 
-    mov rcx, hStdOut        ; RCX = Identificador da janela da consola (ecrã)
-    lea rdx, cursorInfo     ; RDX = Endereço da struct que diz "visível = 0" (falso)
-    call SetConsoleCursorInfo ; Chama a função do Windows: "Aplica estas configurações"
+    mov rcx, hStdOut        ; RCX = Identificador da janela
+    lea rdx, cursorInfo
+    call SetConsoleCursorInfo ; Chama a função do Windows que aplica estas configuraçoes
 
     add rsp, 40
     ret
 cursor endp
 
-
 ;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
 ;   PERMITE MOVER O CURSOR                                   +
 ;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 moverCursor proc
-    push rbx                ; Salva o valor original de RBX
+    push rbx                ; salva o valor original de RBX
     sub rsp, 32
     
-    ; 1. Tratar Y (High part)
+    ; y (high part)
     xor rax, rax
     mov al, posY
-    shl eax, 16             ; Y nos bits altos
+    shl eax, 16             ; y nos bits altos
 
-    ; 2. Tratar X (Low part)
+    ; x (low part)
     xor rbx, rbx
-    mov bl, posX            ; X fica nos bits inferiores
+    mov bl, posX            ; x fica nos bits inferiores
 
-    ; 3. Combinar
-    or rax, rbx             ; EAX agora é Y << 16 | X
+    or rax, rbx             ; eax agora é Y << 16 | X
     
-    ; 4. Chamar API
-    mov rcx, hStdOut        ; Handle
-    mov rdx, rax            ; Posição (passada por valor no RDX)
+    ; coloca o cursor no sitio
+    mov rcx, hStdOut        ; handle
+    mov rdx, rax            ; posiçao (passada por valor no RDX)
     call SetConsoleCursorPosition
 
     add rsp, 32
-    pop rbx                 ; Restaura RBX (Crucial para não crashar main)
+    pop rbx
     ret
 moverCursor endp
 
@@ -410,7 +408,7 @@ mensagemInicial proc
     mov posX, 0
     mov posY, 10
     call moverCursor
-    lea rbx, msgStart0      ; Carrega a frase em rbx
+    lea rbx, msgStart0      ; carrega a frase em rbx
     call ImprimirFraseAtual
 
     mov posX, 0
@@ -449,21 +447,21 @@ ImprimirFraseAtual:
     xor rcx, rcx
     mov cl, [rbx]
     test cl, cl
-    jz FimImprimir      ; Se for 0, acabou esta frase
+    jz FimImprimir      ; se for 0, acabou esta frase
     call putchar
     inc rbx
     jmp ImprimirFraseAtual
     FimImprimir:
         ret
 
-    ; O jogo fica parado aqui até alguém carregar numa tecla.
+    ; o jogo fica parado aqui até alguém carregar numa tecla
 
 WaitKey:
-    call _kbhit             ; Verificase há alguma tecla no buffer
-                            ; Retorna 1 em EAX se houver, 0 se não houver.
+    call _kbhit             ; verifica se há alguma tecla no buffer
+                            ; retorna 1 em eax se houver, 0 se não houver
     
-    test eax, eax           ; Compara o retorno.
-    jz WaitKey              ; Se for 0 não houve click e repete o WaitKey
+    test eax, eax           ; compara o retorno
+    jz WaitKey              ; se for 0 não houve click e repeteo WaitKey
     
 
     ; --- Apagar as instruções do ecrã assim que houver clique---
@@ -481,7 +479,7 @@ mov r12, 0
         cmp r12, 26
         jl LimparInicio
 
-    call _getch             ; Chamamos _getch para limpar o buffer.
+    call _getch             ; chamamos _getch para limpar o buffer
 
     add rsp, 40
     ret
@@ -495,50 +493,49 @@ game proc
 
 GameLoop:
     ; --- ERASE THE TAIL ---
-    ; We erase the very last segment of the snake before moving.
     
     ; Get index of last segment
     mov rcx, snakeLength
-    dec rcx                 ; Zero-based index
-    shl rcx, 2              ; Multiply by 4 (size of X+Y)
+    dec rcx                 ; zero-based index
+    shl rcx, 2              ; multiply by 4 (size of X+Y)
     
     ; Move cursor to Tail X, Y
     xor rdx, rdx
     xor rax, rax
     
-    mov dx, SnakeBody[rcx]      ; Load Tail X
+    mov dx, SnakeBody[rcx]      ; load tail X
     mov posX, dl
-    mov dx, SnakeBody[rcx+2]    ; Load Tail Y
+    mov dx, SnakeBody[rcx+2]    ; load tail Y
     mov posY, dl
     
     call moverCursor
-    mov rcx, 32                 ; ' ' Space
+    mov rcx, 32                 ; ' ' space
     call putchar
 
     ; --- RESTORE HEAD COORDS FOR CALCULATION ---
-    ; Ensure posX/posY match the current Head (Index 0)
+    ; maing sure that posX and posY match the current Head
     mov ax, SnakeBody[0]
     mov posX, al
     mov ax, SnakeBody[2]
     mov posY, al
 
-    ; --- INPUT (Your existing logic) ---
-    mov rcx, 25h                ; Left Arrow
+    ; --- INPUT ---
+    mov rcx, 25h                ; left arrow
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetLeft
     
-    mov rcx, 26h                ; Up Arrow
+    mov rcx, 26h                ; up arrow
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetUp
     
-    mov rcx, 27h                ; Right Arrow
+    mov rcx, 27h                ; right arrow
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetRight
     
-    mov rcx, 28h                ; Down Arrow
+    mov rcx, 28h                ; down arrow
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetDown
@@ -568,34 +565,34 @@ GameLoop:
 
 SetLeft:
     cmp currentDir, 2       ; Are we currently going Right?
-    je ApplyMove            ; If yes, ignore this input (skip change)
+    je ApplyMove            ; If yes, ignore this input
     mov currentDir, 0       ; Otherwise, set direction to Left
     jmp ApplyMove
 
 SetUp:
-    cmp currentDir, 3       ; Are we currently going Down?
-    je ApplyMove            ; If yes, ignore
-    mov currentDir, 1       ; Otherwise, set Up
+    cmp currentDir, 3
+    je ApplyMove
+    mov currentDir, 1
     jmp ApplyMove
 
 SetRight:
-    cmp currentDir, 0       ; Are we currently going Left?
-    je ApplyMove            ; If yes, ignore
-    mov currentDir, 2       ; Otherwise, set Right
+    cmp currentDir, 0
+    je ApplyMove
+    mov currentDir, 2 
     jmp ApplyMove
 
 SetDown:
-    cmp currentDir, 1       ; Are we currently going Up?
-    je ApplyMove            ; If yes, ignore
-    mov currentDir, 3       ; Otherwise, set Down
+    cmp currentDir, 1
+    je ApplyMove
+    mov currentDir, 3
     jmp ApplyMove
 
 ApplyMove:
-    ; --- 4. SHIFT THE BODY ARRAY ---
-    ; Before we update posX/posY, we shift the body history
+    ; --- SHIFT THE BODY ARRAY ---
+    ; body history is shifted and then the posX and posY is updated
     call UpdateBodyArr
 
-    ; --- 5. CALCULATE NEW HEAD POS ---
+    ; --- CALCULATE NEW HEAD POS ---
     cmp currentDir, 0
     je GoLeft
     cmp currentDir, 1
@@ -615,20 +612,20 @@ GoDown:  inc posY
          jmp SaveHead
 
 SaveHead:
-    ; Store the new Head position into Array[0]
+    ; store the new Head position into Array[0]
     movzx rax, posX
     mov SnakeBody[0], ax
     movzx rax, posY
     mov SnakeBody[2], ax
 
-    ; --- 6. CHECK COLLISIONS ---
+    ; --- CHECK COLLISIONS ---
     
-    ; A. Self Collision
+    ; self collision
     call CheckSelfCollision
     cmp rax, 1
     je GameOver
 
-    ; B. Wall Collision (Your existing logic)
+    ; Wall Collision (Your existing logic)
     cmp posX, 0
     je GameOver
     cmp posX, 79
@@ -638,7 +635,7 @@ SaveHead:
     cmp posY, 24
     je GameOver
 
-    ; --- 7. DRAW HEAD ---
+    ; --- DRAW HEAD ---
     call moverCursor
     mov rcx, '@'
     call putchar
@@ -646,7 +643,7 @@ SaveHead:
     cmp snakeLength, 1
     jle CheckFruit
     
-    ; Move cursor to SnakeBody[4]
+    ; move cursor to SnakeBody[4]
     mov ax, SnakeBody[4]
     mov posX, al
     mov ax, SnakeBody[6]
@@ -655,13 +652,13 @@ SaveHead:
     mov rcx, 2Bh
     call putchar
     
-    ; Restore Head Pos to the coordinates
+    ; restore Head Pos to the coordinates
     mov ax, SnakeBody[0]
     mov posX, al
     mov ax, SnakeBody[2]
     mov posY, al
 
-    ; --- 8. FRUIT LOGIC ---
+    ; --- FRUIT LOGIC ---
 CheckFruit:
     mov al, posX
     cmp al, foodX

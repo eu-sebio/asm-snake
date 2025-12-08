@@ -266,7 +266,6 @@ CheckIfOnSnake:
     cmp ax, bx
     jne NextSeg
 
-    ; fruta caiu em cima da cobra ? gerar outra
     jmp GenerateNewFruit
 
 NextSeg:

@@ -4,17 +4,17 @@
 
 includelib ucrt.lib
 includelib legacy_stdio_definitions.lib
-includelib user32.lib 
+includelib user32.lib
 includelib msvcrt.lib
 
 ; --- Funções do Windows ---
 extrn GetStdHandle : proc
 extrn SetConsoleCursorInfo : proc
 extrn SetConsoleTitleA : proc
-extrn SetConsoleCursorPosition : proc 
-extrn ReadConsoleInputA : proc       
-extrn GetAsyncKeyState : proc     
-extrn Sleep : proc                   
+extrn SetConsoleCursorPosition : proc
+extrn ReadConsoleInputA : proc
+extrn GetAsyncKeyState : proc
+extrn Sleep : proc
 extrn ExitProcess : proc
 extrn rand : proc
 extrn srand : proc
@@ -27,6 +27,9 @@ extrn _getch : proc
 extrn putchar : proc
 
 ; --- Estruturas ---
+    ; (o visual studio não permitiu incluir o windows.inc, que era necessário para permitir esconder o rato,
+    ; porque não fazia parte do MASM original )
+
 CONSOLE_CURSOR_INFO STRUCT
     dwSize      DWORD ?
     bVisible    DWORD ?
@@ -51,6 +54,7 @@ CONSOLE_CURSOR_INFO ENDS
     msgEnd0 db "                                                   --- Game over ---", 0
     msgEnd1 db "                                                  -> Your Score is: %d ", 10, 0
     msgEnd2 db "                                            Press any key to leave (Bye bye)", 0
+
     
     ; Variáveis
     hStdOut qword 0
@@ -61,7 +65,7 @@ CONSOLE_CURSOR_INFO ENDS
 
     cursorInfo   CONSOLE_CURSOR_INFO <100, 0> 
 
-    ;posição inicial
+    ;posição
     posX byte 40
     posY byte 12
 
@@ -80,7 +84,7 @@ CONSOLE_CURSOR_INFO ENDS
 .code
 main proc
 
-    sub rsp, 40             
+    sub rsp, 40
 
     mov rcx, STD_OUTPUT_HANDLE
     call GetStdHandle
@@ -105,7 +109,7 @@ main proc
     ;--- Direção random da Snake
     call rand           ; Gera número
     and rax, 3          ; Filtra para 0-3
-    mov currentDir, al                ; chamar aqui a função random
+    mov currentDir, al
 
     ; Initialize the head in the array
     movzx rax, posX
@@ -343,6 +347,9 @@ gameWindow proc
     ret
 gameWindow endp
 
+;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
+;   RECONHECE O CURSOR                               +
+;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 cursor proc
     sub rsp, 40
 
@@ -352,9 +359,12 @@ cursor proc
 
     add rsp, 40
     ret
-
 cursor endp
 
+
+;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
+;   PERMITE MOVER O CURSOR                                   +
+;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 moverCursor proc
     push rbx                ; Salva o valor original de RBX
     sub rsp, 32
@@ -381,14 +391,17 @@ moverCursor proc
     ret
 moverCursor endp
 
+;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
+;   PERMITE MOVER O CURSOR                                   +
+;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 mensagemInicial proc
     sub rsp, 40
 
     mov posX, 0
     mov posY, 10
     call moverCursor
-    lea rbx, msgStart0      ; Carrega a frase
-    call ImprimirFraseAtual ; Chama a rotina que imprime o que está em RBX
+    lea rbx, msgStart0      ; Carrega a frase em rbx
+    call ImprimirFraseAtual
 
     mov posX, 0
     mov posY, 13
@@ -435,16 +448,16 @@ FimImprimir:
 
 
     ; O jogo fica parado aqui até alguém carregar numa tecla.
+
 WaitKey:
-    call _kbhit             ; Verifica: "Há alguma tecla no buffer?" (Não bloqueia)
+    call _kbhit             ; Verificase há alguma tecla no buffer
                             ; Retorna 1 em EAX se houver, 0 se não houver.
     
     test eax, eax           ; Compara o retorno.
-    jz WaitKey              ; Se for 0 (ninguém tocou em nada), repete o loop infinitamente.
+    jz WaitKey              ; Se for 0 não houve click e repete o WaitKey
     
 
     ; --- Apagar as instruções do ecrã assim que houver clique---
-
 mov r12, 0
     LimparInicio:
         mov posX, 0
@@ -462,33 +475,33 @@ mov r12, 0
    
 
 
-    call _getch             ; Se chegamos aqui, alguém tocou numa tecla!
-                            ; Chamamos _getch para "comer" essa tecla e limpar o buffer.
-                            ; Se não fizermos isto, o buffer fica sujo para o jogo.
+    call _getch             ; Chamamos _getch para limpar o buffer.
+
     add rsp, 40
     ret
 mensagemInicial endp
 
-
+;   *   @+++++++++++++++++++++++++++++++++++++++++++++++++++++
+;   MECÂNICA DO JOGO                                  +
+;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 game proc
     sub rsp, 40
 
 GameLoop:
-    ; --- 1. ERASE THE TAIL ---
+    ; --- ERASE THE TAIL ---
     ; We erase the very last segment of the snake before moving.
-    ; Unless we just ate? (For simplicity, we erase, if we ate we grow later)
     
     ; Get index of last segment
     mov rcx, snakeLength
     dec rcx                 ; Zero-based index
-    shl rcx, 2              ; Multiply by 4 (size of X+Y in words)
+    shl rcx, 2              ; Multiply by 4 (size of X+Y)
     
     ; Move cursor to Tail X, Y
     xor rdx, rdx
     xor rax, rax
     
     mov dx, SnakeBody[rcx]      ; Load Tail X
-    mov posX, dl                ; Set helper var for moverCursor
+    mov posX, dl
     mov dx, SnakeBody[rcx+2]    ; Load Tail Y
     mov posY, dl
     
@@ -496,14 +509,14 @@ GameLoop:
     mov rcx, 32                 ; ' ' Space
     call putchar
 
-    ; --- 2. RESTORE HEAD COORDS FOR CALCULATION ---
+    ; --- RESTORE HEAD COORDS FOR CALCULATION ---
     ; Ensure posX/posY match the current Head (Index 0)
     mov ax, SnakeBody[0]
     mov posX, al
     mov ax, SnakeBody[2]
     mov posY, al
 
-    ; --- 3. INPUT (Your existing logic) ---
+    ; --- INPUT (Your existing logic) ---
     mov rcx, 25h                ; Left Arrow
     call GetAsyncKeyState
     test ax, 8000h
@@ -529,20 +542,23 @@ GameLoop:
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetLeft
+
     mov rcx, 57h ; W
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetUp
+
     mov rcx, 44h ; D
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetRight
+
     mov rcx, 53h ; S
     call GetAsyncKeyState
     test ax, 8000h
     jnz SetDown
 
-    jmp ApplyMove
+    jmp ApplyMove  ; continue last movement
 
 SetLeft:
     cmp currentDir, 2       ; Are we currently going Right?
@@ -621,20 +637,19 @@ SaveHead:
     mov rcx, '@'
     call putchar
     
-    ; Optional: Draw the "Neck" (Index 1) as 'o' to make head distinct
     cmp snakeLength, 1
     jle CheckFruit
     
-    ; Move cursor to SnakeBody[4] (Index 1 X)
+    ; Move cursor to SnakeBody[4]
     mov ax, SnakeBody[4]
     mov posX, al
     mov ax, SnakeBody[6]
     mov posY, al
     call moverCursor
-    mov rcx, 2Bh       ; 'o'
+    mov rcx, 2Bh
     call putchar
     
-    ; Restore Head Pos for Fruit Check
+    ; Restore Head Pos to the coordinates
     mov ax, SnakeBody[0]
     mov posX, al
     mov ax, SnakeBody[2]
@@ -664,7 +679,7 @@ CheckFruit:
         inc snakeLength
 SkipGrow:
     call scoreBoard
-
+    
 DelayLoop:
     movzx rcx, speed
     call Sleep
@@ -731,6 +746,9 @@ CheckSelfCollision proc
     NoCollision:
     xor rax, rax
     ret
+CheckSelfCollision endp
+
+end
 CheckSelfCollision endp
 
 end

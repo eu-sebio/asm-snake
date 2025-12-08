@@ -464,7 +464,7 @@ WaitKey:
     jz WaitKey              ; se for 0 não houve click e repeteo WaitKey
     
 
-    ; --- Apagar as instruções do ecrã assim que houver clique---
+    ; --- apagar o ecrã inicial assim que houver clique---
 mov r12, 0
     LimparInicio:
         mov posX, 0
@@ -479,7 +479,7 @@ mov r12, 0
         cmp r12, 26
         jl LimparInicio
 
-    call _getch             ; chamamos _getch para limpar o buffer
+    call _getch             ; _getch para limpar o buffer
 
     add rsp, 40
     ret

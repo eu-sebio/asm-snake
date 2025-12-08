@@ -1,3 +1,7 @@
+;António Pereira Nº 66241
+;Alexandre Morais Nº 75162
+;André Eusébio Nº 68181
+
 includelib ucrt.lib
 includelib legacy_stdio_definitions.lib
 includelib user32.lib 

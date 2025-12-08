@@ -41,6 +41,7 @@ CONSOLE_CURSOR_INFO ENDS
     msgStart15 db "            -> You lose by biting yourself or the walls, so be careful!! (The Snake is vegan)", 0
     msgStart2 db "            -> To change directions use the arrow keys or AWSD                                               ", 0
     msgStart3 db "                                                   Press any key to start                                           ", 0
+    namingGroup db "                          Antonio Pereira N.66241, Alexandre Morais N.75162, Andre Eusebio N.68181", 0
     apagaTexto db "                                                                                                                                                  ", 0
     printedScore db "Score: %d   ", 10, 0
     msgEnd0 db "                                                   --- Game over ---", 0
@@ -409,6 +410,12 @@ mensagemInicial proc
     lea rbx, msgStart3
     call ImprimirFraseAtual
 
+    mov posX, 0
+    mov posY, 25
+    call moverCursor
+    lea rbx, namingGroup
+    call ImprimirFraseAtual
+
     jmp WaitKey
 
 ImprimirFraseAtual:
@@ -643,7 +650,7 @@ CheckFruit:
     call foodRandomizer
     inc qword ptr [points]
     
-    ; GROW THE SNAKE
+    ; GROW THE SNAKE/INCREASE SPEED
     cmp snakeLength, 200    ; Max Check
     jge SkipGrow
     cmp speed, 5
@@ -652,17 +659,7 @@ CheckFruit:
     IncSnakeLenght:
         inc snakeLength
 SkipGrow:
-    
     call scoreBoard
-    
-    ; Speed increase logic
-    mov rax, points
-    xor rdx, rdx
-    mov rbx, 6
-    div rbx
-    cmp rdx, 0
-    jne DelayLoop
-    dec speed
 
 DelayLoop:
     movzx rcx, speed

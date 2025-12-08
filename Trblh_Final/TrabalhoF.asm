@@ -494,10 +494,10 @@ game proc
 GameLoop:
     ; --- ERASE THE TAIL ---
     
-    ; Get index of last segment
+
     mov rcx, snakeLength
-    dec rcx                 ; zero-based index
-    shl rcx, 2              ; multiply by 4 (size of X+Y)
+    dec rcx
+    shl rcx, 2
     
     ; Move cursor to Tail X, Y
     xor rdx, rdx
@@ -625,7 +625,7 @@ SaveHead:
     cmp rax, 1
     je GameOver
 
-    ; Wall Collision (Your existing logic)
+    ; wall Collision
     cmp posX, 0
     je GameOver
     cmp posX, 79

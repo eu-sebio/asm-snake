@@ -472,9 +472,6 @@ mov r12, 0
         cmp r12, 26
         jl LimparInicio
 
-   
-
-
     call _getch             ; Chamamos _getch para limpar o buffer.
 
     add rsp, 40

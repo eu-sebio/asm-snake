@@ -113,9 +113,9 @@ main proc
 
     ; Initialize the head in the array
     movzx rax, posX
-    mov SnakeBody[0], ax    ; Store X at index 0
+    mov SnakeBody[0], ax    ; Store X 
     movzx rax, posY
-    mov SnakeBody[2], ax    ; Store Y at index 2 (Words are 2 bytes)
+    mov SnakeBody[2], ax    ; Store Y
 
     call game
     call endingScreen

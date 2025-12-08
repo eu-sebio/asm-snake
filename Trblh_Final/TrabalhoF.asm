@@ -443,8 +443,8 @@ ImprimirFraseAtual:
     call putchar
     inc rbx
     jmp ImprimirFraseAtual
-FimImprimir:
-    ret
+    FimImprimir:
+        ret
 
 
     ; O jogo fica parado aqui até alguém carregar numa tecla.
